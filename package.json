@@ -1,0 +1,25 @@
+{
+  "name": "autologinwb",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fqqName/autoLogin.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/fqqName/autoLogin/issues"
+  },
+  "homepage": "https://github.com/fqqName/autoLogin#readme",
+  "devDependencies": {
+    "cypress": "^15.9.0",
+    "dotenv": "^17.2.3"
+  }
+}

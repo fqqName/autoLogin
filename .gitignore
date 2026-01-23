@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Environment Variables / Secrets (IMPORTANT!)
+.env
+
+# OS System Files
+.DS_Store
+Thumbs.db
+
+# Cypress Artifacts (videos and screenshots)
+cypress/videos/
+cypress/screenshots/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
