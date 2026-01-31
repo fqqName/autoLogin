@@ -3,6 +3,7 @@ node_modules/
 
 # Environment Variables / Secrets (IMPORTANT!)
 .env
+cypress/browser_profile/
 
 # OS System Files
 .DS_Store
@@ -11,6 +12,7 @@ Thumbs.db
 # Cypress Artifacts (videos and screenshots)
 cypress/videos/
 cypress/screenshots/
+
 
 # Logs
 npm-debug.log*

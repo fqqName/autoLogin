@@ -1,146 +1,102 @@
-describe('Wildberries Purchasing Scenario', () => {
-	const PHONE_NUMBER = Cypress.env('WB_TEST_PHONE')
+const newLocal = describe('Wildberries Login Flow', () => {
+	it('Executes Login Flow with Phone Typing', () => {
+		// 1. Open baseUrl
+		cy.visit('/')
 
-	beforeEach(() => {
-		// 1. SETUP & BLOCKING
-		// Block advertising and tracking resources
-		cy.intercept('**google-analytics.com**', { statusCode: 503 })
-		cy.intercept('**yandex.ru**', { statusCode: 503 })
-		cy.intercept('**mail.ru**', { statusCode: 503 })
-		cy.intercept('**wb-internal-ad-banners**', { statusCode: 503 }) // Hypothetical pattern
-		// Add more specific patterns if known or discovered during debugging
+		// 2. Wait 2 seconds
+		cy.wait(2000)
 
-		// Set User-Agent (Cypress allows this via config or per request, but visiting the page sets it for the session mostly)
-		// Ideally handled in config, but we can try to influence headers.
-		// Actually, just relying on standard Cypress UA is often fine, or configured in `cypress.config.js` (userAgent property).
-		// Let's assume standard behavior for now unless specified closer.
-		// The prompt asked to "Set the User-Agent to match a standard real browser".
-		// We can do this in the visit options or config. Let's do it in config or here.
-		// Doing it in visit options for the main page load:
-	})
+		// 3. Open secondUrl
+		const secondUrl =
+			Cypress.config('secondUrl') || 'https://www.wildberries.by/security/login'
+		cy.visit(secondUrl)
 
-	it('Complete E2E Purchase Flow', () => {
-		// Override User Agent for this test
-		const userAgent =
-			'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+		// 4. Wait 2 seconds
+		cy.wait(2000)
 
-		// 2. SMART LOGIN
-		cy.visit('/', {
-			headers: {
-				'User-Agent': userAgent,
-			},
-			onBeforeLoad: win => {
-				Object.defineProperty(win.navigator, 'userAgent', { value: userAgent })
-			},
-		})
+		// 5. Select Country (+375)
+		cy.log('Opening Country List...')
+		cy.get('div[data-class="btn"]').should('be.visible').click()
+		cy.wait(500)
+		cy.contains('+375').should('be.visible').click()
 
-		// Check if authorized
-		cy.get('body').then($body => {
-			// Adjust current selector logic based on actual WB DOM.
-			// Profile icon usually has a specific class or link.
-			// Assuming a selector for profile/avatar.
-			// If not found, we login.
-			// "navbar-pc__icon--profile" or similar.
-			const isAuthorized =
-				$body.find('.navbar-pc__icon--profile').length > 0 ||
-				$body.text().includes('Профиль')
+		// 6. Type Phone Number (User Provided Logic)
+		const phone = Cypress.env('WB_TEST_PHONE')
 
-			if (!isAuthorized) {
-				cy.log('User not authorized. Proceeding to login.')
-				// Navigate to login
-				cy.get('.j-main-login').click() // Adjust selector
+		cy.log(`Typing phone number: ${phone}`)
+		// Using stable selector [data-testid="phoneInput"]
+		cy.get('[data-testid="phoneInput"]')
+			.should('be.visible')
+			.click()
+			.type(phone, { delay: 100 })
 
-				cy.humanWait(1000, 2000)
+		cy.log('Phone typed. Clicking Get Code...')
 
-				// Type phone number
-				cy.get('.input-item').type(PHONE_NUMBER) // Adjust selector
-				cy.humanWait(500, 1000)
+		// Wait for button to be enabled
+		cy.wait(1000)
 
-				cy.contains('button', 'Получить код').click()
+		cy.get('[data-testid="requestCodeBtn"]')
+			.should('be.visible')
+			.and('not.be.disabled')
+			.click()
 
-				// Pause for manual SMS entry
-				cy.log('Please enter the SMS code manually and then resume the test.')
-				cy.pause()
+		/// wait for "Запросите код повторно"
+		cy.wait(70000)
+		cy.log('cy.wait(70000) finished')
+		cy.contains('Запросите код повторно').should('be.visible')
+		cy.log('Waiting for "Запросите код повторно" button')
 
-				// Verification of login success
-				cy.get('.navbar-pc__icon--profile', { timeout: 10000 }).should('exist')
-			} else {
-				cy.log('User already authorized.')
-			}
-		})
+		cy.get('[data-test-id="auth-code-confirmation-get-code-btn"]')
+			.should('be.visible') // Убеждаемся, что она видна
+			.and('not.be.disabled') // Убеждаемся, что она стала активной (не серая)
+			.click()
 
-		// 3. SMART "ADD TO CART"
-		cy.get('#searchInput').type('мужская футболка{enter}')
-		cy.humanWait(2000, 3000)
+		cy.pause()
 
-		// Select first two cards
-		cy.get('.product-card-list .product-card').eq(0).as('card1')
-		cy.get('.product-card-list .product-card').eq(1).as('card2')
+		cy.log('Waiting for SMS via ADB...')
 
-		const addProductToCart = cardAlias => {
-			cy.get(cardAlias).scrollIntoView().trigger('mouseover')
-			cy.humanWait(500, 1000)
+		// Run the bash script to get the SMS code
+		// Timeout set to 65s to accommodate the 60s script timeout
+		// Запускаем скрипт ожидания СМС
+		// ... вы уже нажали кнопку "Получить код"
 
-			// Find "Add to Cart" button within the card
-			cy.get(cardAlias).find('.product-card__add-basket').click({ force: true }) // "In basket" or cart icon
-			cy.humanWait(1000, 2000)
+		// Запускаем скрипт чтения базы данных SMS
+		// timeout: 65000 (чуть больше, чем ждет скрипт внутри, чтобы Cypress не убил его раньше времени)
+		cy.exec('./get_sms_db.sh', { timeout: 65000 })
+			.then(result => {
+				// Очищаем результат
+				const code = result.stdout.trim()
 
-			// Conditional size check using jQuery sync logic
-			cy.get('body').then($body => {
-				// Check for size popup/drawer presence
-				// Selector needs to be accurate for WB. e.g. .popup-list-of-sizes
-				const $sizePopup = $body.find('.popup-list-of-sizes, .sizes-list-block')
-
-				if ($sizePopup.length > 0 && $sizePopup.is(':visible')) {
-					cy.log('Size selection required.')
-					// Find first active size
-					const $activeSizes = $sizePopup.find(
-						'.sizes-list__item:not(.disabled)',
+				// Проверка на ошибки
+				if (
+					!code ||
+					code.includes('Timeout') ||
+					code.includes('inaccessible') ||
+					code.includes('Permission denied')
+				) {
+					// Если база недоступна, выводим понятную ошибку
+					throw new Error(
+						'❌ Ошибка доступа к SMS. Убедитесь, что выполнен "adb root" или используйте метод через уведомления.',
 					)
-					if ($activeSizes.length > 0) {
-						cy.wrap($activeSizes.first()).click()
-						cy.humanWait(500, 1500)
-					} else {
-						cy.log('No active sizes found!')
-					}
-				} else {
-					cy.log('No size selection required or popup not found.')
 				}
+
+				// 1. Лог в Cypress
+				cy.log('-------------------------------------------')
+				cy.log(`🚀 КОД ИЗ БАЗЫ (DB): ${code}`)
+				cy.log('-------------------------------------------')
+
+				// 2. Лог в консоль браузера
+				console.log(
+					'%c 💾 DB SMS CODE: ' + code,
+					'background: #000080; color: #fff; font-size: 20px; padding: 10px;',
+				)
+
+				return cy.wrap(code)
 			})
-
-			// Verify button state changed?
-			// WB often replaces the button or adds a counter.
-			// For now, relying on lack of error and flow continuation.
-		}
-
-		addProductToCart('@card1')
-		cy.humanWait(1000, 2000)
-		addProductToCart('@card2')
-
-		// 4. CART CALCULATION
-		cy.get('.navbar-pc__icon--basket').click()
-		cy.humanWait(2000, 3000)
-
-		// Parse prices
-		let totalSumOptimistic = 0
-
-		cy.get('.list-item__price-new')
-			.each($el => {
-				const priceText = $el.text().replace(/\s/g, '').replace('₽', '')
-				const price = parseInt(priceText, 10)
-				totalSumOptimistic += price
-				cy.log(`Item price: ${price}`)
-			})
-			.then(() => {
-				cy.log(`Calculated Total: ${totalSumOptimistic}`)
-
-				// Get displayed total
-				cy.get('.b-top__total .total-price__sum').then($totalEl => {
-					const totalText = $totalEl.text().replace(/\s/g, '').replace('₽', '')
-					const displayedTotal = parseInt(totalText, 10)
-
-					expect(totalSumOptimistic).to.eq(displayedTotal)
-				})
+			.then(code => {
+				// Вводим код
+				cy.get('[data-testid="smsCodeInput"]').should('be.visible').type(code)
 			})
 	})
 })
+// })
