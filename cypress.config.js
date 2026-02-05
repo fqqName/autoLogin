@@ -8,6 +8,7 @@ module.exports = defineConfig({
 			config.env.WB_TEST_PRODUCT = process.env.WB_TEST_PRODUCT
 			config.env.WB_TEST_PRODUCT_COLOR = process.env.WB_TEST_PRODUCT_COLOR
 			config.env.WB_TEST_PRODUCT_SIZE = process.env.WB_TEST_PRODUCT_SIZE
+			config.env.WB_TEST_SECOND_PRODUCT = process.env.WB_TEST_SECOND_PRODUCT
 
 			on('before:browser:launch', (browser = {}, launchOptions) => {
 				if (browser.family === 'chromium' && browser.name !== 'electron') {
