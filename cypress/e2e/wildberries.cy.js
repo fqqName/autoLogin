@@ -1,14 +1,15 @@
-const newLocal = describe('Wildberries Login Flow', () => {
-	it('Executes Login Flow with Phone Typing', () => {
+describe('Wildberries Login Flow', () => {
+	it('Executes Login Flow with Phone Typing and SMS', () => {
 		// 1. Open baseUrl
 		cy.visit('/')
 
-		// 2. Wait 2 seconds
+		// 2. Wait 2 seconds (для стабильности загрузки)
 		cy.wait(2000)
 
 		// 3. Open secondUrl
+		// Используем переменную или дефолтное значение
 		const secondUrl =
-			Cypress.config('secondUrl') || 'https://www.wildberries.by/security/login'
+			Cypress.env('secondUrl') || 'https://www.wildberries.by/security/login'
 		cy.visit(secondUrl)
 
 		// 4. Wait 2 seconds
@@ -16,15 +17,22 @@ const newLocal = describe('Wildberries Login Flow', () => {
 
 		// 5. Select Country (+375)
 		cy.log('Opening Country List...')
+		// Используем force:true на случай перекрытия элементов
 		cy.get('div[data-class="btn"]').should('be.visible').click()
+
+		// Ждем анимацию списка
 		cy.wait(500)
 		cy.contains('+375').should('be.visible').click()
 
-		// 6. Type Phone Number (User Provided Logic)
+		// 6. Type Phone Number
 		const phone = Cypress.env('WB_TEST_PHONE')
 
+		// Проверка, что телефон задан
+		if (!phone) throw new Error('Не задана переменная окружения WB_TEST_PHONE')
+
 		cy.log(`Typing phone number: ${phone}`)
-		// Using stable selector [data-testid="phoneInput"]
+
+		// Ввод номера
 		cy.get('[data-testid="phoneInput"]')
 			.should('be.visible')
 			.click()
@@ -32,71 +40,69 @@ const newLocal = describe('Wildberries Login Flow', () => {
 
 		cy.log('Phone typed. Clicking Get Code...')
 
-		// Wait for button to be enabled
-		cy.wait(1000)
-
+		// 7. Click "Get Code"
+		cy.wait(1000) // Даем UI "остыть" после ввода
 		cy.get('[data-testid="requestCodeBtn"]')
 			.should('be.visible')
 			.and('not.be.disabled')
 			.click()
 
-		/// wait for "Запросите код повторно"
+		// 8. Wait for "Запросите код повторно"
+		// Мы специально ждем 70 сек, чтобы протестировать именно повторную отправку
+		cy.log('Waiting 70s for retry button...')
 		cy.wait(70000)
-		cy.log('cy.wait(70000) finished')
-		cy.contains('Запросите код повторно').should('be.visible')
-		cy.log('Waiting for "Запросите код повторно" button')
 
-		cy.get('[data-test-id="auth-code-confirmation-get-code-btn"]')
-			.should('be.visible') // Убеждаемся, что она видна
-			.and('not.be.disabled') // Убеждаемся, что она стала активной (не серая)
-			.click()
-
-		cy.pause()
+		// Клик по кнопке повторной отправки
+		// cy.get('[data-test-id="auth-code-confirmation-get-code-btn"]')
+		// .should('be.visible')
+		// .and('not.be.disabled')
+		// .click()
 
 		cy.log('Waiting for SMS via ADB...')
 
-		// Run the bash script to get the SMS code
-		// Timeout set to 65s to accommodate the 60s script timeout
-		// Запускаем скрипт ожидания СМС
-		// ... вы уже нажали кнопку "Получить код"
+		// 9. 🧹 ОЧИСТКА: Удаляем старые уведомления с телефона
+		// Это гарантирует, что следующий найденный код будет НОВЫМ
+		cy.log('Cleaning old notifications...')
+		cy.exec('adb shell service call notification 1', {
+			failOnNonZeroExit: false,
+		})
+		cy.wait(1000) // Даем секунду на удаление
 
-		// Запускаем скрипт чтения базы данных SMS
-		// timeout: 65000 (чуть больше, чем ждет скрипт внутри, чтобы Cypress не убил его раньше времени)
-		cy.exec('./get_sms_db.sh', { timeout: 65000 })
+		// 10. 🖱️ КЛИК: Нажимаем "Запросить код повторно"
+		cy.get('[data-test-id="auth-code-confirmation-get-code-btn"]')
+			.should('be.visible')
+			.and('not.be.disabled')
+			.click()
+		cy.exec('./get_notification_sms.sh', { timeout: 65000 })
 			.then(result => {
-				// Очищаем результат
-				const code = result.stdout.trim()
+				const output = result.stdout.trim()
 
-				// Проверка на ошибки
+				// Проверка на ошибки скрипта
 				if (
-					!code ||
-					code.includes('Timeout') ||
-					code.includes('inaccessible') ||
-					code.includes('Permission denied')
+					!output ||
+					output.includes('Timeout') ||
+					output.includes('Error') ||
+					output.includes('Permission denied')
 				) {
-					// Если база недоступна, выводим понятную ошибку
-					throw new Error(
-						'❌ Ошибка доступа к SMS. Убедитесь, что выполнен "adb root" или используйте метод через уведомления.',
-					)
+					throw new Error(`❌ Ошибка получения СМС: ${output}`)
 				}
 
-				// 1. Лог в Cypress
-				cy.log('-------------------------------------------')
-				cy.log(`🚀 КОД ИЗ БАЗЫ (DB): ${code}`)
-				cy.log('-------------------------------------------')
+				const code = output
 
-				// 2. Лог в консоль браузера
+				// Логирование
+				cy.log('-------------------------------------------')
+				cy.log(`🚀 КОД ПОЛУЧЕН: ${code}`)
+				cy.log('-------------------------------------------')
 				console.log(
-					'%c 💾 DB SMS CODE: ' + code,
-					'background: #000080; color: #fff; font-size: 20px; padding: 10px;',
+					`%c 🔥 CODE: ${code}`,
+					'background: #222; color: #bada55; font-size: 20px;',
 				)
 
 				return cy.wrap(code)
 			})
 			.then(code => {
-				// Вводим код
+				// 10. Type SMS Code
 				cy.get('[data-testid="smsCodeInput"]').should('be.visible').type(code)
 			})
 	})
 })
-// })

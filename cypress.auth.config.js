@@ -5,9 +5,6 @@ module.exports = defineConfig({
 	e2e: {
 		setupNodeEvents(on, config) {
 			config.env.WB_TEST_PHONE = process.env.WB_TEST_PHONE
-			config.env.WB_TEST_PRODUCT = process.env.WB_TEST_PRODUCT
-			config.env.WB_TEST_PRODUCT_COLOR = process.env.WB_TEST_PRODUCT_COLOR
-			config.env.WB_TEST_PRODUCT_SIZE = process.env.WB_TEST_PRODUCT_SIZE
 
 			on('before:browser:launch', (browser = {}, launchOptions) => {
 				if (browser.family === 'chromium' && browser.name !== 'electron') {
